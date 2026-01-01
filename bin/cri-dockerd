@@ -1,0 +1,6 @@
+#!/bin/sh
+
+exec /cri-dockerd \
+    --container-runtime-endpoint unix:///var/run/cri-dockerd.sock \
+    --network-plugin=cni \
+    --pod-infra-container-image=registry.k8s.io/pause:3.9

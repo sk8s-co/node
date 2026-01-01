@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Task",
+      "TodoWrite",
+      "LSP",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "AskUserQuestion",
+      "EnterPlanMode",
+      "ExitPlanMode"
+    ]
+  }
+}

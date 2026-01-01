@@ -1,0 +1,30 @@
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+
+# Container Runtime Configuration
+# cri-dockerd provides CRI interface to Docker runtime
+containerRuntimeEndpoint: unix:///var/run/cri-dockerd.sock
+
+# Authentication & Authorization (permissive for standalone mode)
+authentication:
+  anonymous:
+    enabled: true
+  webhook:
+    enabled: false
+authorization:
+  mode: AlwaysAllow
+
+# Static Pod Support
+staticPodPath: /etc/kubernetes/manifests
+
+# Networking & DNS
+clusterDomain: cluster.local
+clusterDNS:
+  - 10.96.0.10
+
+# Logging
+logging:
+  format: text
+
+# Resource Management (disable swap check for containerized environments)
+failSwapOn: false

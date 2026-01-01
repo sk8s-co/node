@@ -1,0 +1,19 @@
+services:
+  kubelet:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker:/var/lib/docker
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - kubelet-data:/var/lib/kubelet
+      - static-pods:/etc/kubernetes/manifests
+    # command: ["--v=5"]  # Pass additional kubelet arguments
+    privileged: true
+    network_mode: host
+    pid: host
+
+volumes:
+  kubelet-data:
+  static-pods:
