@@ -1,6 +1,6 @@
 # node
 
-A containerized Kubelet with Docker runtime support via cri-dockerd, designed for Serverless Kubernetes environments.
+A containerized Kubelet based on minikube's kicbase image, with systemd-managed services and self-contained Docker runtime.
 
 ## Quick Start
 
@@ -8,58 +8,56 @@ A containerized Kubelet with Docker runtime support via cri-dockerd, designed fo
 docker compose up --build
 ```
 
-This starts a standalone kubelet (v1.34.0) that connects to Docker on the host via cri-dockerd.
+This starts a standalone kubelet (v1.34.0) with cri-dockerd inside a systemd-managed container.
 
 ## What's Included
 
+- **kicbase v0.0.47** - Minikube's base image with Docker and systemd pre-configured
 - **Kubelet v1.34.0** - Compiled from Kubernetes source
 - **cri-dockerd v0.3.21** - Docker CRI adapter (replaces removed dockershim)
-- **kubectl v1.34.0** - Kubernetes CLI (same version as kubelet)
-- **concurrently** - Process manager for running kubelet + cri-dockerd together
+- **systemd** - Service manager for kubelet and cri-dockerd
 
 ## Architecture
 
-The container runs both kubelet and cri-dockerd using concurrently. The cri-dockerd process connects to the host's Docker daemon and provides a CRI interface for kubelet to communicate with.
+The container uses minikube's kicbase image as the foundation, providing a complete systemd environment with Docker runtime. Both kubelet and cri-dockerd run as systemd services managed by the init system.
 
 ```
-kubelet → cri-dockerd → /var/run/docker.sock → Docker (host)
+┌─────────────────────────────────────┐
+│    kicbase Container (systemd)      │
+│                                     │
+│  ┌──────────┐      ┌──────────┐    │
+│  │ kubelet  │─────▶│cri-dockerd│   │
+│  │ (service)│      │ (service) │   │
+│  └──────────┘      └─────┬─────┘   │
+│                          │         │
+│                    ┌─────▼─────┐   │
+│                    │  dockerd  │   │
+│                    │(built-in) │   │
+│                    └───────────┘   │
+└─────────────────────────────────────┘
 ```
 
 See [CLAUDE.md](./CLAUDE.md) for detailed architecture documentation.
 
 ## Configuration
 
-- **Kubelet config**: `config/dockerd.yml` (mounted as `/kubelet.yaml`)
-  - Only contains non-default settings for clarity
+- **Kubelet config**: `kubelet.yaml/kicbase.yml` (mounted as `/kubelet.yaml`)
 - **API Endpoints**:
   - `10250` - Kubelet API (read/write)
   - `10255` - Read-only API
-  - `10248` - Health endpoint
-- **Static Pods**: Place manifests in the `static-pods` volume (mounted at `/etc/kubernetes/manifests`)
-
-### Passing Custom Arguments
-
-You can pass additional arguments to kubelet via docker-compose:
-
-```yaml
-services:
-  kubelet:
-    build: .
-    command: ["--v=5", "--hostname-override=mynode"]
-```
-
-Arguments in `command` are passed only to kubelet (not cri-dockerd).
+  - `10248` - Health endpoint (localhost only)
+- **Static Pods**: Place manifests in `/etc/kubernetes/manifests` (see `manifests/hello-world.yaml` for example)
 
 ## Requirements
 
-- Docker with cgroup v2 support
-- Host must have `/sys/fs/cgroup` available for QoS management
+- Docker with systemd support
+- Privileged container mode (required for systemd and cgroup management)
 
 ## Documentation
 
 See [CLAUDE.md](./CLAUDE.md) for:
-- Detailed architecture diagrams
-- Build configuration options
+- Detailed architecture and build process
+- Systemd service configuration
 - cri-dockerd setup details
 - Kubelet configuration reference
-- Volume mount explanations
+- Build arguments and customization
