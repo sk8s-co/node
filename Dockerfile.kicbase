@@ -1,6 +1,6 @@
 ARG KICBASE_VERSION=v0.0.47 \
     KUBE_VERSION_GO=1.24 \
-    KUBE_VERSION=v1.34 \
+    KUBE_VERSION=1.34 \
     CRI_DOCKERD_VERSION=v0.3.21 \
     CRI_DOCKERD_VERSION_GO=1.24
 
@@ -23,7 +23,7 @@ ENV KUBE_VERSION_GO=${KUBE_VERSION_GO} \
 
 RUN apk add --no-cache git make bash
 RUN --mount=type=cache,id=go-${KUBE_VERSION_GO},target=/go-${KUBE_VERSION_GO} \
-    git clone https://github.com/kubernetes/kubernetes.git -b ${KUBE_VERSION}.0 --depth=1 /kubernetes && \
+    git clone https://github.com/kubernetes/kubernetes.git -b v${KUBE_VERSION}.0 --depth=1 /kubernetes && \
     cd /kubernetes && \
     CGO_ENABLED=0 make all WHAT=cmd/kubelet KUBE_STATIC_OVERRIDES=kubelet && \
     mv /kubernetes/_output/local/go/bin/kubelet /bin/kubelet
