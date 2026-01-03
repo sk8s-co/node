@@ -41,5 +41,9 @@ RUN ln -sf /etc/systemd/system/cri-docker.service /etc/systemd/system/multi-user
     ln -sf /etc/systemd/system/cri-docker.socket /etc/systemd/system/sockets.target.wants/cri-docker.socket && \
     ln -sf /etc/systemd/system/kubelet.service /etc/systemd/system/multi-user.target.wants/kubelet.service
 
+# Copy custom entrypoint for runtime filesystem setup
+COPY ./entrypoint.sh /entrypoint-custom.sh
+RUN chmod +x /entrypoint-custom.sh
+
 ENV container=docker
-ENTRYPOINT [ "/usr/local/bin/entrypoint", "/sbin/init" ]
+ENTRYPOINT [ "/entrypoint-custom.sh", "/sbin/init" ]

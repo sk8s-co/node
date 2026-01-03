@@ -10,11 +10,8 @@ services:
       - label:disable
     volumes:
       - /lib/modules:/lib/modules:ro
-      - kicbase:/var
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker:/var/lib/docker
     tmpfs:
       - /run
       - /tmp
-    tty: true
-
-volumes:
-  kicbase: {}
