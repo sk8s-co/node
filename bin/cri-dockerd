@@ -5,4 +5,5 @@ exec /srv/cri-dockerd \
     --container-runtime-endpoint=unix:///var/run/cri-dockerd.sock \
     --cri-dockerd-root-directory=/var/run/cri-dockerd \
     --network-plugin=cni \
+    --hairpin-mode=hairpin-veth \
     --log-level=trace
