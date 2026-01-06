@@ -1,0 +1,16 @@
+--- a/pkg/kubelet/kubelet_pods.go
++++ b/pkg/kubelet/kubelet_pods.go
+@@ -270,11 +270,8 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVo
+ // - the Pod is on the pod network and PodIP has not yet been set (e.g., Pod sandbox is being created).
+ // - the Pod is on Windows, and contains a hostProcess container.
+ func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
+-	shouldMount := len(podIPs) > 0 || pod.Spec.HostNetwork
+-	if runtime.GOOS == "windows" {
+-		return shouldMount && !kubecontainer.HasWindowsHostProcessContainer(pod)
+-	}
+-	return shouldMount
++	// PATCH: Disable /etc/hosts mounting to avoid Docker-in-Docker overlayfs conflicts
++	return false
+ }
+
+ // makeMounts determines the mount points for the given container.

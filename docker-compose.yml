@@ -1,17 +1,26 @@
 services:
-  kicbase:
+  kubelet:
     build:
       context: .
-      dockerfile: ./Dockerfile.kicbase
+      dockerfile: ./Dockerfile
     privileged: true
-    security_opt:
-      - seccomp:unconfined
-      - apparmor:unconfined
-      - label:disable
     volumes:
-      - /lib/modules:/lib/modules:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker:/var/lib/docker
-    tmpfs:
-      - /run
-      - /tmp
+
+  # kicbase:
+  #   build:
+  #     context: .
+  #     dockerfile: ./Dockerfile.kicbase
+  #   privileged: true
+  #   security_opt:
+  #     - seccomp:unconfined
+  #     - apparmor:unconfined
+  #     - label:disable
+  #   volumes:
+  #     - /lib/modules:/lib/modules:ro
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /var/lib/docker:/var/lib/docker
+  #   tmpfs:
+  #     - /run
+  #     - /tmp

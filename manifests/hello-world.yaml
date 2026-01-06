@@ -5,6 +5,7 @@ metadata:
   namespace: default
 spec:
   restartPolicy: Always
+  hostNetwork: true
   containers:
     - name: nginx
       image: nginx:alpine

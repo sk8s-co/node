@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+exec /srv/kubelet \
+    --config=/etc/kubernetes/kubelet.yaml \
+    "$@"
