@@ -22,11 +22,11 @@ FROM builder AS kubelet
 ARG KUBE_VERSION
 ENV KUBE_VERSION=${KUBE_VERSION}
 
-# Patch kubelet to disable /etc/hosts management (DooD workaround)
-COPY patches /patches
-RUN cd /kubernetes && git apply /patches/kubelet-disable-etc-hosts.patch
+# Patch kubelet for DooD compatibility
+# COPY patches /patches
+# RUN cd /kubernetes && git apply /patches/kubelet-disable-etc-hosts.patch
 
-RUN --mount=type=cache,id=go-${KUBE_VERSION},target=/go \
+RUN --mount=type=cache,id=kubelet-${KUBE_VERSION},target=/go \
     CGO_ENABLED=0 make all WHAT=cmd/kubelet KUBE_STATIC_OVERRIDES=kubelet && \
     mv /kubernetes/_output/local/go/bin/kubelet /usr/local/bin/kubelet
 
@@ -35,17 +35,15 @@ ARG CRI_DOCKERD_VERSION
 ENV CRI_DOCKERD_VERSION=${CRI_DOCKERD_VERSION}
 
 RUN apk add --no-cache git build-base bash make
-RUN --mount=type=cache,id=go-${CRI_DOCKERD_VERSION},target=/go \
+RUN --mount=type=cache,id=cri-${CRI_DOCKERD_VERSION},target=/go \
     git clone https://github.com/Mirantis/cri-dockerd.git -b v${CRI_DOCKERD_VERSION} --depth=1 /cri && \
     cd /cri && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /usr/local/bin/cri-dockerd .
 
-FROM golang:${CNI_VERSION_GO}-alpine AS cni
+FROM golang:${CNI_VERSION_GO}-alpine AS builder-cni
 ARG CNI_VERSION
-ENV CNI_VERSION=${CNI_VERSION}
-
 RUN apk add --no-cache git make
-RUN --mount=type=cache,id=go-${CNI_VERSION},target=/go \
+RUN --mount=type=cache,id=cni-${CNI_VERSION},target=/go \
     git clone https://github.com/containernetworking/plugins.git -b v${CNI_VERSION} --depth=1 /cni && \
     cd /cni && \
     CGO_ENABLED=0 ./build_linux.sh -ldflags '-extldflags -static -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=${CNI_VERSION}'
@@ -55,18 +53,19 @@ FROM scratch AS reduced
 # COPY --from=kubernetes /kubelet /srv/kubelet
 COPY --from=kubelet /usr/local/bin/kubelet /srv/kubelet
 COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
-COPY --from=cni /cni/bin/ /opt/cni/bin/
+COPY --from=builder-cni /cni/bin/ /opt/cni/bin/
 COPY --from=concurrently /concurrently /bin/concurrently
 COPY bin/* /bin/
 COPY manifests /etc/kubernetes/manifests
-COPY cni/ /etc/cni/net.d/
+COPY standalone.yaml /etc/kubernetes/kubelet.yaml
+COPY cni /etc/cni/net.d
 
 FROM alpine
 RUN apk add --no-cache bash ca-certificates iptables conntrack-tools
 COPY --from=reduced / /
-ENV CONCURRENTLY_RESTART_TRIES=-1 \
-    CONCURRENTLY_RESTART_AFTER=1000 \
-    CONCURRENTLY_NAMES=cri-dockerd,kubelet
+ENV CONCURRENTLY_NAMES=kubelet,cri-dockerd \
+    CONCURRENTLY_KILL_OTHERS=true \
+    CONCURRENTLY_KILL_SIGNAL=SIGINT
 
-COPY standalone.yaml /etc/kubernetes/kubelet.yaml
-ENTRYPOINT ["concurrently", "-P", "cri-dockerd", "kubelet {*}"]
+# ENTRYPOINT ["concurrently", "-P", "kubelet {*}", "cri-dockerd"]
+ENTRYPOINT ["concurrently", "-P", "kubelet {*}", "cri-dockerd"]

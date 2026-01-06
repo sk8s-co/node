@@ -1,6 +1,35 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Ensure machine-id is set
+if [ ! -f "/etc/machine-id" ] || [ ! -s "/etc/machine-id" ]; then
+    echo "Setting machine-id..."
+    cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id
+fi
+
+# Clean up any leftover k8s containers from previous runs
+echo "Cleaning up stale Kubernetes containers..."
+docker ps -aq --filter "name=k8s_" 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
+
+# Wait for cri-dockerd socket to be ready
+echo "Waiting for cri-dockerd socket..."
+while [ ! -S "/var/run/cri-dockerd.sock" ]; do
+    sleep 0.1
+done
+
+# Give cri-dockerd time to start accepting connections
+echo "Socket exists, waiting for cri-dockerd to accept connections..."
+sleep 2
+
+# Check if kubelet root directory exists
+if [ ! -d "/var/run/kubelet" ]; then
+    echo "Error: /var/run/kubelet does not exist"
+    exit 1
+fi
 
 exec /srv/kubelet \
     --config=/etc/kubernetes/kubelet.yaml \
+    --root-dir=/var/run/kubelet \
+    --cert-dir=/var/run/kubelet/pki \
+    --v=5 \
     "$@"

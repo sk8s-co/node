@@ -10,18 +10,14 @@ This project implements a kubelet that runs inside Docker using a Docker-out-of-
 
 ### Core Components
 
-1. **Kubelet**: Built from Kubernetes source (configurable version, default 1.34.0) with a critical patch applied
-   - Patched to disable `/etc/hosts` management to avoid overlayfs conflicts in DooD environments
-   - Patch location: `patches/kubelet-disable-etc-hosts.patch`
+1. **Kubelet**: Built from Kubernetes source (configurable version, default 1.34.0)
    - Configuration: `standalone.yaml` (KubeletConfiguration)
+   - Runs with full host permissions as a system daemon
 
 2. **CRI-Dockerd**: Container Runtime Interface adapter for Docker (v0.3.21)
    - Bridges kubelet to Docker daemon via `/var/run/cri-dockerd.sock`
-   - Configured with `--network-plugin=` (disabled)
-
-3. **CNI Plugins**: Container Network Interface plugins (v1.7.1)
-   - Bridge plugin configured with subnet `10.244.0.0/16`
-   - Configuration: `cni/10-bridge.conf`
+   - Configured with `--network-plugin=` (disabled, uses host networking)
+   - Root directory: `/var/run/cri-dockerd` (stores pod sandbox checkpoints)
 
 ### Process Management
 
@@ -30,25 +26,37 @@ Uses `concurrently` to run both `cri-dockerd` and `kubelet` processes simultaneo
 ### Docker-out-of-Docker (DooD) Setup
 
 Key architectural decisions:
-- Container runs in privileged mode
+- Container runs with **full host-level permissions** (root-like daemon mode):
+  - `privileged: true` - All Linux capabilities + device access
+  - `network_mode: host` - Shares host network namespace
+  - `pid: host` - Shares host PID namespace (can see all host processes)
+  - `ipc: host` - Shares host IPC namespace (shared memory, semaphores)
+  - `uts: host` - Shares host UTS namespace (hostname)
 - Mounts host's `/var/run/docker.sock` and `/var/lib/docker`
-- Kubelet patch disables `/etc/hosts` management (critical for DooD)
+- Mounts host's `/sys/fs/cgroup` (read-write) for creating cgroup hierarchies and setting resource limits
+- All kubelet/cri-dockerd ephemeral data stored in `/var/run` (durable between restarts via volume mounts)
 - Static pod path: `/etc/kubernetes/manifests/`
 
 ### Kubelet Configuration Highlights
 
 (`standalone.yaml`)
 - **Container Runtime**: Unix socket at `/var/run/cri-dockerd.sock`
+- **Root Directory**: `/var/run/kubelet` (ephemeral data, durable via volume mount)
+- **Certificate Directory**: `/var/run/kubelet/pki` (TLS certs)
 - **Authentication**: Anonymous enabled, webhook disabled
 - **Authorization**: AlwaysAllow (permissive standalone mode)
-- **Resource Enforcement**: Disabled (`cgroupsPerQOS: false`, `enforceNodeAllocatable: []`)
+- **Resource Enforcement**: Disabled (`cgroupsPerQOS: false`, `enforceNodeAllocatable: []`, `localStorageCapacityIsolation: false`)
+- **Eviction**: Disabled (`evictionHard: {}`, prevents filesystem inspection errors in containerized environment)
+- **Image GC**: Disabled (`imageGCHighThresholdPercent: 100`)
 - **Swap**: Allowed (`failSwapOn: false`)
 
 ## Build Commands
 
-### Build the Docker Image
+### Build with Default Versions
 ```bash
-docker compose build kubelet
+make up  # Builds automatically
+# or
+docker compose build
 ```
 
 ### Build with Custom Versions
@@ -58,47 +66,62 @@ docker build \
   --build-arg KUBE_VERSION_GO=1.24 \
   --build-arg KUBE_VERSION_PATCH=0 \
   --build-arg CRI_DOCKERD_VERSION=0.3.21 \
-  --build-arg CNI_VERSION=1.7.1 \
   -t kubelet .
 ```
 
 ## Running
 
+### Using Makefile
+```bash
+make up    # Build and start kubelet container
+make clean # Stop kubelet container
+```
+
 ### Using Docker Compose
 ```bash
-docker compose up kubelet
+docker compose up --build
 ```
 
 ### Manual Docker Run
 ```bash
 docker run --privileged \
+  --network host \
+  --pid host \
+  --ipc host \
+  --uts host \
+  -v /var/run/kubelet:/var/run/kubelet \
+  -v /var/run/cri-dockerd:/var/run/cri-dockerd \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /var/lib/docker:/var/lib/docker \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
   kubelet
 ```
 
 ## Multi-Stage Build Structure
 
-The Dockerfile uses a complex multi-stage build:
+The Dockerfile uses a multi-stage build:
 
 1. **builder**: Base Alpine Go image, clones Kubernetes source
-2. **kubelet**: Applies DooD patch, builds kubelet binary with caching
+2. **kubelet**: Builds kubelet binary with caching
 3. **cri-dockerd**: Builds CRI-Dockerd from source
-4. **cni**: Builds CNI plugins from source
-5. **reduced**: Scratch image collecting all binaries
-6. **Final**: Alpine with runtime dependencies (bash, ca-certificates, iptables, conntrack-tools)
+4. **reduced**: Scratch image collecting all binaries
+5. **Final**: Alpine with runtime dependencies (bash, ca-certificates, iptables, conntrack-tools)
 
 All Go builds use `CGO_ENABLED=0` for static binaries and leverage Docker layer caching via `--mount=type=cache`.
+
+## Data Persistence
+
+All ephemeral kubelet/cri-dockerd data is stored in `/var/run` on the Docker VM host:
+- `/var/run/kubelet` - Kubelet state, pod logs, TLS certificates
+- `/var/run/cri-dockerd` - Pod sandbox checkpoints
+
+These directories persist across container restarts via volume mounts but are ephemeral at the VM level (cleared on Docker Desktop VM restart).
 
 ## Static Pods
 
 Pods defined in `/etc/kubernetes/manifests/` are automatically started by kubelet.
 
 Example static pod: `manifests/hello-world.yaml` (nginx with hostNetwork)
-
-## Critical Patch Details
-
-The `kubelet-disable-etc-hosts.patch` modifies `pkg/kubelet/kubelet_pods.go` to force `shouldMountHostsFile()` to always return `false`. This prevents kubelet from attempting to manage `/etc/hosts` in containers, which causes overlayfs conflicts when running in a DooD environment where the kubelet itself is containerized.
 
 ## CI/CD
 

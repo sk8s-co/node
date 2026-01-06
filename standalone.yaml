@@ -2,9 +2,18 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 
 containerRuntimeEndpoint: unix:///var/run/cri-dockerd.sock
+staticPodPath: /etc/kubernetes/manifests
 failSwapOn: false
 cgroupsPerQOS: false
 enforceNodeAllocatable: []
+localStorageCapacityIsolation: false
+imageGCHighThresholdPercent: 100
+evictionHard: {}
+
+# Disable aggressive garbage collection
+minimumGCAge: 24h
+maxPerPodContainerCount: 10
+maxContainerCount: 100
 
 # Authentication & Authorization (permissive for standalone mode)
 authentication:
@@ -14,5 +23,3 @@ authentication:
     enabled: false
 authorization:
   mode: AlwaysAllow
-
-staticPodPath: /etc/kubernetes/manifests

@@ -2,4 +2,7 @@
 set -e
 
 exec /srv/cri-dockerd \
-    --network-plugin=
+    --container-runtime-endpoint=unix:///var/run/cri-dockerd.sock \
+    --cri-dockerd-root-directory=/var/run/cri-dockerd \
+    --network-plugin=cni \
+    --log-level=trace
