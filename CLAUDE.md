@@ -16,8 +16,25 @@ This project implements a kubelet that runs inside Docker using a Docker-out-of-
 
 2. **CRI-Dockerd**: Container Runtime Interface adapter for Docker (v0.3.21)
    - Bridges kubelet to Docker daemon via `/var/run/cri-dockerd.sock`
-   - Configured with `--network-plugin=` (disabled, uses host networking)
-   - Root directory: `/var/run/cri-dockerd` (stores pod sandbox checkpoints)
+   - **Verified Configuration** (`bin/cri-dockerd`):
+     - `--container-runtime-endpoint=unix:///var/run/cri-dockerd.sock`
+     - `--cri-dockerd-root-directory=/var/run/cri-dockerd` (stores pod sandbox checkpoints)
+     - `--network-plugin=cni` (CNI networking for proper pod isolation)
+     - `--hairpin-mode=hairpin-veth` (enables pods to reach themselves via service IPs)
+     - `--log-level=trace` (debug logging for troubleshooting)
+
+3. **CNI Bridge Plugin**: Container networking with bridge mode (v1.7.1)
+   - **Verified Configuration** (`cni/10-bridge.conf`):
+     - Bridge: `kubelet0` (auto-created on first pod launch)
+     - Pod subnet: `10.88.0.0/16` (IPAM via host-local)
+     - Gateway: `10.88.0.1` (auto-assigned with `isDefaultGateway: true`)
+     - `hairpinMode: true` - Required for service loopback (pods accessing themselves via service IP)
+     - `ipMasq: true` - Enables pod-to-internet connectivity via NAT
+     - Creates veth pairs with hairpin mode enabled on bridge ports
+
+4. **crictl**: CRI debugging tool (v1.33.0)
+   - Config: `/etc/crictl.yaml` (runtime/image endpoints, timeout)
+   - Used to inspect pods, containers, and images managed by cri-dockerd
 
 ### Process Management
 
@@ -116,6 +133,25 @@ All ephemeral kubelet/cri-dockerd data is stored in `/var/run` on the Docker VM 
 - `/var/run/cri-dockerd` - Pod sandbox checkpoints
 
 These directories persist across container restarts via volume mounts but are ephemeral at the VM level (cleared on Docker Desktop VM restart).
+
+## Verified Functionality
+
+The following features have been tested and verified working:
+
+### CRI-Dockerd & CNI Networking
+- **Pod Sandbox Creation**: Pause containers launch successfully via `RunPodSandbox` CRI call
+- **Network Namespace**: Pause containers get proper network namespace with CNI-assigned IP
+- **Bridge Networking**: `kubelet0` bridge auto-creates with gateway IP `10.88.0.1/16`
+- **Hairpin Mode**: Verified enabled on veth interfaces (`/sys/class/net/veth*/brport/hairpin_mode = 1`)
+- **Connectivity**:
+  - Pod ↔ Gateway: Working (ping 10.88.0.1 from pod)
+  - Host ↔ Pod: Working (ping pod IP from host)
+  - Pod → Internet: Working (egress via ipMasq NAT)
+- **crictl**: Successfully manages pods via `runp`, `stopp`, `rmp`, `inspectp` commands
+
+### Network Mode Trade-offs
+- **CNI Mode** (current): Proper pod network isolation, no host port mapping support
+- **Docker Bridge Mode** (`--network-plugin=`): Host port mappings work, but all pods share same network
 
 ## Static Pods
 
