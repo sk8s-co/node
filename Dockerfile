@@ -50,7 +50,7 @@ RUN --mount=type=cache,id=cri-tools-${CRITOOLS_VERSION},target=/go \
     cd /cri-tools && \
     CGO_ENABLED=0 make binaries BUILD_PATH=/cri-tools GOOS="" GOARCH=""
 
-FROM golang:${CNI_VERSION_GO}-alpine AS builder-cni
+FROM golang:${CNI_VERSION_GO}-alpine AS cni
 ARG CNI_VERSION
 RUN apk add --no-cache git make
 RUN --mount=type=cache,id=cni-${CNI_VERSION},target=/go \
@@ -64,7 +64,7 @@ FROM scratch AS reduced
 COPY --from=kubelet /usr/local/bin/kubelet /srv/kubelet
 COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
 COPY --from=cri-tools /cri-tools/bin/crictl /bin/crictl
-COPY --from=builder-cni /cni/bin/ /opt/cni/bin/
+COPY --from=cni /cni/bin/ /opt/cni/bin/
 COPY --from=concurrently /concurrently /bin/concurrently
 COPY bin/* /bin/
 COPY manifests /etc/kubernetes/manifests
@@ -75,9 +75,8 @@ COPY cri/crictl.yaml /etc/crictl.yaml
 FROM alpine
 RUN apk add --no-cache bash ca-certificates iptables conntrack-tools
 COPY --from=reduced / /
-ENV CONCURRENTLY_NAMES=cri-dockerd \
+ENV CONCURRENTLY_NAMES=kubelet,cri-dockerd \
     CONCURRENTLY_KILL_OTHERS=true \
     CONCURRENTLY_KILL_SIGNAL=SIGINT
 
-# ENTRYPOINT ["concurrently", "-P", "kubelet {*}", "cri-dockerd"]
-ENTRYPOINT ["concurrently", "-P", "cri-dockerd"]
+ENTRYPOINT ["concurrently", "-P", "kubelet {*}", "cri-dockerd"]

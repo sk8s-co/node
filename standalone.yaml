@@ -1,19 +1,11 @@
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 
+# Container Runtime
 containerRuntimeEndpoint: unix:///var/run/cri-dockerd.sock
-staticPodPath: /etc/kubernetes/manifests
-failSwapOn: false
-cgroupsPerQOS: false
-enforceNodeAllocatable: []
-localStorageCapacityIsolation: false
-imageGCHighThresholdPercent: 100
-evictionHard: {}
 
-# Disable aggressive garbage collection
-minimumGCAge: 24h
-maxPerPodContainerCount: 10
-maxContainerCount: 100
+# Static Pods
+staticPodPath: /etc/kubernetes/manifests
 
 # Authentication & Authorization (permissive for standalone mode)
 authentication:
@@ -23,3 +15,47 @@ authentication:
     enabled: false
 authorization:
   mode: AlwaysAllow
+
+# DNS Configuration
+clusterDomain: cluster.local
+clusterDNS:
+  - 10.96.0.10  # Adjust if running CoreDNS or other DNS service
+
+# Resource Management (disabled - no systemd)
+cgroupsPerQOS: false
+cgroupDriver: cgroupfs
+enforceNodeAllocatable: []
+
+# Eviction (disabled - containerized environment)
+evictionHard: {}
+
+# Image Management (disabled GC)
+imageGCHighThresholdPercent: 100
+
+# Storage
+failSwapOn: false
+localStorageCapacityIsolation: false
+
+# TLS
+rotateCertificates: false
+serverTLSBootstrap: false
+
+# Node Registration
+registerNode: true
+
+# Networking (explicit defaults for CNI compatibility)
+hairpinMode: hairpin-veth  # Must match cri-dockerd --hairpin-mode
+makeIPTablesUtilChains: true
+
+# Pod Limits
+maxPods: 110
+
+# CPU Management
+cpuCFSQuota: true
+
+# Kernel Settings (cannot modify in container)
+protectKernelDefaults: false
+
+# Shutdown (no graceful shutdown without systemd)
+shutdownGracePeriod: 0s
+shutdownGracePeriodCriticalPods: 0s
