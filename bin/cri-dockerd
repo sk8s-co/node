@@ -1,15 +1,25 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Check if cri-dockerd root directory exists
-if [ ! -d "/var/run/cri-dockerd" ]; then
-    echo "Error: /var/run/cri-dockerd does not exist"
-    exit 1
+# Wait for docker socket, which should be volumed from host
+echo "Waiting for docker socket..."
+while [ ! -S "/var/run/docker.sock" ]; do
+    sleep 0.1
+done
+echo "Docker socket is ready."
+
+echo "Waiting for cri-dockerd flags..."
+while [ -z "${CRI_DOCKERD_FLAGS:-}" ]; do
+    sleep 0.1
+done
+echo "cri-dockerd flags are ready."
+
+if [ "${DEBUG:-false}" = "true" ]; then
+    set -x
+    env
 fi
 
+echo "Starting cri-dockerd..."
 exec /srv/cri-dockerd \
-    --container-runtime-endpoint=unix:///var/run/cri-dockerd.sock \
-    --cri-dockerd-root-directory=/var/run/cri-dockerd \
-    --network-plugin=cni \
-    --hairpin-mode=hairpin-veth \
-    --log-level=trace
+    ${LOG_LEVEL_FLAG} \
+    $CRI_DOCKERD_FLAGS

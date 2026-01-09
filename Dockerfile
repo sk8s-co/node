@@ -8,29 +8,17 @@ ARG CRITOOLS_VERSION_GO=1.25
 ARG CNI_VERSION=1.7.1
 ARG CNI_VERSION_GO=1.23
 
-# FROM ghcr.io/sk8s-co/kubernetes:${KUBE_VERSION} AS kubernetes
 FROM ghcr.io/scaffoldly/concurrently:9.x AS concurrently
-
-FROM golang:${KUBE_VERSION_GO}-alpine AS builder
-ARG KUBE_VERSION \
-    KUBE_VERSION_PATCH
-ENV KUBE_VERSION=${KUBE_VERSION} \
-    KUBE_VERSION_PATCH=${KUBE_VERSION_PATCH}
-RUN apk add --no-cache git make bash
-RUN git clone https://github.com/kubernetes/kubernetes.git -b v${KUBE_VERSION}.${KUBE_VERSION_PATCH} --depth=1 /kubernetes
-WORKDIR /kubernetes
-
-FROM builder AS kubelet
-ARG KUBE_VERSION
-ENV KUBE_VERSION=${KUBE_VERSION}
-
-# Patch kubelet for DooD compatibility
-# COPY patches /patches
-# RUN cd /kubernetes && git apply /patches/kubelet-disable-etc-hosts.patch
-
-RUN --mount=type=cache,id=kubelet-${KUBE_VERSION},target=/go \
-    CGO_ENABLED=0 make all WHAT=cmd/kubelet KUBE_STATIC_OVERRIDES=kubelet && \
-    mv /kubernetes/_output/local/go/bin/kubelet /usr/local/bin/kubelet
+FROM ghcr.io/sk8s-co/kubernetes:${KUBE_VERSION} AS kubernetes
+# FROM golang:${KUBE_VERSION_GO}-alpine AS kubernetes
+# ARG KUBE_VERSION
+# ENV KUBE_VERSION=${KUBE_VERSION}
+# RUN apk add --no-cache git make bash
+# RUN git clone https://github.com/kubernetes/kubernetes.git -b v${KUBE_VERSION}.${KUBE_VERSION_PATCH} --depth=1 /kubernetes
+# WORKDIR /kubernetes
+# RUN --mount=type=cache,id=kubelet-${KUBE_VERSION},target=/go \
+#     CGO_ENABLED=0 make all WHAT=cmd/kubelet KUBE_STATIC_OVERRIDES=kubelet && \
+#     mv /kubernetes/_output/local/go/bin/kubelet /kubelet
 
 FROM golang:${CRI_DOCKERD_VERSION_GO}-alpine AS cri-dockerd
 ARG CRI_DOCKERD_VERSION
@@ -64,24 +52,23 @@ RUN --mount=type=cache,id=cni-${CNI_VERSION},target=/go \
     CGO_ENABLED=0 ./build_linux.sh -ldflags '-extldflags -static -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=${CNI_VERSION}'
 
 FROM scratch AS reduced
-
-# COPY --from=kubernetes /kubelet /srv/kubelet
-COPY --from=kubelet /usr/local/bin/kubelet /srv/kubelet
+COPY --from=kubernetes /kubelet /srv/kubelet
 COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
 COPY --from=concurrently /concurrently /srv/concurrently
 COPY --from=cri-tools /cri-tools/bin/crictl /bin/crictl
 COPY --from=cni /cni/bin/* /opt/cni/bin/
 COPY bin/* /bin/
-COPY manifests /etc/kubernetes/manifests
-COPY standalone.yaml /etc/kubernetes/kubelet.yaml
-COPY cni /etc/cni/net.d
+COPY manifests/* /etc/kubernetes/manifests/
+COPY cni/* /etc/cni/net.d/
 COPY cri/crictl.yaml /etc/crictl.yaml
+COPY kubelet/* /etc/kubernetes/kubelet/
 
 FROM alpine
 RUN apk add --no-cache \
     bash \
     ca-certificates \
-    conntrack-tools \
+    curl \
+    docker-cli \
     conntrack-tools \
     iptables \
     jq

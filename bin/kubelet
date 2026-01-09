@@ -1,27 +1,27 @@
 #!/bin/bash
 set -euo pipefail
 
-# Ensure machine-id is set
-if [ ! -f "/etc/machine-id" ] || [ ! -s "/etc/machine-id" ]; then
-    echo "Setting machine-id..."
-    cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id
-fi
-
-# Wait for cri-dockerd socket to be ready
+# Wait for cri-dockerd socket, which is created by cri-dockerd
 echo "Waiting for cri-dockerd socket..."
 while [ ! -S "/var/run/cri-dockerd.sock" ]; do
     sleep 0.1
 done
+echo "cri-dockerd socket is ready."
 
-# Check if kubelet root directory exists
-if [ ! -d "/var/run/kubelet" ]; then
-    echo "Error: /var/run/kubelet does not exist"
-    exit 1
+# Wait for kubelet flags, which is created by entrypoint
+echo "Waiting for kubelet flags..."
+while [ -z "${KUBELET_FLAGS:-}" ]; do
+    sleep 0.1
+done
+echo "Kubelet flags are ready."
+
+if [ "${DEBUG:-false}" = "true" ]; then
+    set -x
+    env
 fi
 
+echo "Starting kubelet..."
 exec /srv/kubelet \
-    --config=/etc/kubernetes/kubelet.yaml \
-    --root-dir=/var/run/kubelet \
-    --cert-dir=/var/run/kubelet/pki \
-    --v=5 \
+    ${VERBOSITY_FLAG} \
+    $KUBELET_FLAGS \
     "$@"

@@ -1,45 +1,91 @@
 #!/bin/bash
 set -euo pipefail
+_KUBELET_ARGS="$@"
 
-# Cleanup function to gracefully stop pods before exit
-cleanup() {
-    echo "Received shutdown signal..."
+# Defaults for standalone mode
+_MACHINE_ID=$(cat /etc/machine-id 2>/dev/null || echo "standalone")
+_KUBELET_FLAGS=(
+    --config=/var/run/kubelet.yaml
+    --root-dir=/var/run/kube
+    --cert-dir=/var/run/kube/pki
+    # TODO: Infer cluster domain/dns from docker config
+    --cluster-domain=cluster.local
+    --cluster-dns=10.96.0.10
+)
+_CRI_DOCKERD_FLAGS=(
+    --container-runtime-endpoint=unix:///var/run/cri-dockerd.sock
+    --cri-dockerd-root-directory=/var/run/kube/cri-dockerd
+    --network-plugin=cni
+    --hairpin-mode=hairpin-veth
+)
+_VERBOSITY_FLAG=""
+_LOG_LEVEL_FLAG=""
 
-    # Get all pod IDs
-    POD_IDS=$(crictl pods -q 2>/dev/null || true)
+if [ -z "$_MACHINE_ID" ]; then
+    echo "Error: /etc/machine-id does not exist"
+    exit 1
+fi
 
-    if [ -n "$POD_IDS" ]; then
-        echo "Stopping pods with 30s grace period: $POD_IDS"
-        echo "$POD_IDS" | xargs -r -I {} crictl --timeout 30s stopp {} 2>/dev/null || true
+if [ ! -d "/var/run/kube" ]; then
+    echo "Error: /var/run/kube does not exist"
+    exit 1
+fi
 
-        echo "Removing pods: $POD_IDS"
-        echo "$POD_IDS" | xargs -r -I {} crictl rmp {} 2>/dev/null || true
-
-        echo "Pod cleanup completed"
-    else
-        echo "No pods to clean up"
-    fi
-
-    # Kill child processes (concurrently and its children)
-    echo "Stopping concurrently (PID: $PID)..."
-    kill -SIGINT "$PID" 2>/dev/null || true
-    exit 0
+_mkdirs() {
+    mkdir -p /var/run/kube/kubelet
+    mkdir -p /var/run/kube/cri-dockerd
 }
 
-# Trap SIGTERM and SIGINT signals
-trap cleanup SIGTERM SIGINT
+_activate() {
+    KUBELET_YAML="$1"
+
+    if [ ! -f "$KUBELET_YAML" ]; then
+        echo "Error: Kubelet configuration file does not exist: $KUBELET_YAML"
+        exit 1
+    fi
+
+    echo "Activating kubelet configuration from: $KUBELET_YAML"
+    cp "$KUBELET_YAML" /var/run/kubelet.yaml
+}
+
+_init() {
+    echo "Initializing Node..."
+    echo "  Machine ID: $_MACHINE_ID"
+
+    if [ "${_MACHINE_ID:-}" = "standalone" ]; then
+        echo ""
+        echo "Warning: Running in standalone mode without /etc/machine-id mounted."
+        echo "         Launching in 5 seconds, press Ctrl+C to abort..."
+        echo ""
+        sleep 5
+    fi
+
+    _mkdirs
+    _activate "/etc/kubernetes/kubelet/${_MACHINE_ID}.yaml"
+}
+
+# Main script execution starts here
+_init
+
+if [ "${DEBUG:-false}" = "true" ]; then
+    echo "Debug mode is enabled."
+    echo "  kubelet Flags: ${_KUBELET_FLAGS[*]}"
+    echo "  cri-dockerd Flags: ${_CRI_DOCKERD_FLAGS[*]}"
+    _VERBOSITY_FLAG="--v=7"
+    _LOG_LEVEL_FLAG="--log-level=debug"
+fi
 
 export \
-    CONCURRENTLY_NAMES=cri-dockerd \
+    CONCURRENTLY_NAMES=kubelet,cri-dockerd \
     CONCURRENTLY_KILL_OTHERS=true \
-    CONCURRENTLY_KILL_SIGNAL=SIGINT
+    CONCURRENTLY_KILL_SIGNAL=SIGINT \
+    VERBOSITY_FLAG="$_VERBOSITY_FLAG" \
+    LOG_LEVEL_FLAG="$_LOG_LEVEL_FLAG" \
+    KUBELET_FLAGS="${_KUBELET_FLAGS[*]}" \
+    CRI_DOCKERD_FLAGS="${_CRI_DOCKERD_FLAGS[*]}"
 
-/srv/concurrently -P \
+exec /srv/concurrently -P \
+    --teardown exitpoint \
     "kubelet {*}" \
     "cri-dockerd" \
-    "$@" &
-
-PID=$!
-wait $PID
-
-
+    $_KUBELET_ARGS

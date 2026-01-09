@@ -16,11 +16,6 @@ authentication:
 authorization:
   mode: AlwaysAllow
 
-# DNS Configuration
-clusterDomain: cluster.local
-clusterDNS:
-  - 10.96.0.10  # Adjust if running CoreDNS or other DNS service
-
 # Resource Management (disabled - no systemd)
 cgroupsPerQOS: false
 cgroupDriver: cgroupfs
@@ -44,7 +39,7 @@ serverTLSBootstrap: false
 registerNode: true
 
 # Networking (explicit defaults for CNI compatibility)
-hairpinMode: hairpin-veth  # Must match cri-dockerd --hairpin-mode
+hairpinMode: hairpin-veth # Must match cri-dockerd --hairpin-mode
 makeIPTablesUtilChains: true
 
 # Pod Limits
