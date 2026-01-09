@@ -1,0 +1,45 @@
+#!/bin/bash
+set -euo pipefail
+
+# Cleanup function to gracefully stop pods before exit
+cleanup() {
+    echo "Received shutdown signal..."
+
+    # Get all pod IDs
+    POD_IDS=$(crictl pods -q 2>/dev/null || true)
+
+    if [ -n "$POD_IDS" ]; then
+        echo "Stopping pods with 30s grace period: $POD_IDS"
+        echo "$POD_IDS" | xargs -r -I {} crictl --timeout 30s stopp {} 2>/dev/null || true
+
+        echo "Removing pods: $POD_IDS"
+        echo "$POD_IDS" | xargs -r -I {} crictl rmp {} 2>/dev/null || true
+
+        echo "Pod cleanup completed"
+    else
+        echo "No pods to clean up"
+    fi
+
+    # Kill child processes (concurrently and its children)
+    echo "Stopping concurrently (PID: $PID)..."
+    kill -SIGINT "$PID" 2>/dev/null || true
+    exit 0
+}
+
+# Trap SIGTERM and SIGINT signals
+trap cleanup SIGTERM SIGINT
+
+export \
+    CONCURRENTLY_NAMES=cri-dockerd \
+    CONCURRENTLY_KILL_OTHERS=true \
+    CONCURRENTLY_KILL_SIGNAL=SIGINT
+
+/srv/concurrently -P \
+    "kubelet {*}" \
+    "cri-dockerd" \
+    "$@" &
+
+PID=$!
+wait $PID
+
+

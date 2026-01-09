@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Check if cri-dockerd root directory exists
+if [ ! -d "/var/run/cri-dockerd" ]; then
+    echo "Error: /var/run/cri-dockerd does not exist"
+    exit 1
+fi
+
 exec /srv/cri-dockerd \
     --container-runtime-endpoint=unix:///var/run/cri-dockerd.sock \
     --cri-dockerd-root-directory=/var/run/cri-dockerd \

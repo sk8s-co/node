@@ -38,8 +38,13 @@ ENV CRI_DOCKERD_VERSION=${CRI_DOCKERD_VERSION}
 
 RUN apk add --no-cache git build-base bash make
 RUN --mount=type=cache,id=cri-${CRI_DOCKERD_VERSION},target=/go \
-    git clone https://github.com/Mirantis/cri-dockerd.git -b v${CRI_DOCKERD_VERSION} --depth=1 /cri && \
+    # git clone https://github.com/Mirantis/cri-dockerd.git -b v${CRI_DOCKERD_VERSION} --depth=1 /cri && \
+    git clone https://github.com/cnuss/cri-dockerd.git -b issues/532 --depth=1 /cri && \
     cd /cri && \
+    # Override "podsandbox" constant to avoid Docker Desktop API filtering \
+    # Docker Desktop filters containers with io.kubernetes.docker.type="podsandbox" \
+    # Using "sandboxpod" makes pause containers visible in docker ps and crictl pods \
+    sed -i 's/containerTypeLabelSandbox[[:space:]]*=[[:space:]]*"podsandbox"/containerTypeLabelSandbox = "sandboxpod"/' core/docker_service.go && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /usr/local/bin/cri-dockerd .
 
 FROM golang:${CRITOOLS_VERSION_GO}-alpine AS cri-tools
@@ -63,9 +68,9 @@ FROM scratch AS reduced
 # COPY --from=kubernetes /kubelet /srv/kubelet
 COPY --from=kubelet /usr/local/bin/kubelet /srv/kubelet
 COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
+COPY --from=concurrently /concurrently /srv/concurrently
 COPY --from=cri-tools /cri-tools/bin/crictl /bin/crictl
-COPY --from=cni /cni/bin/ /opt/cni/bin/
-COPY --from=concurrently /concurrently /bin/concurrently
+COPY --from=cni /cni/bin/* /opt/cni/bin/
 COPY bin/* /bin/
 COPY manifests /etc/kubernetes/manifests
 COPY standalone.yaml /etc/kubernetes/kubelet.yaml
@@ -73,10 +78,13 @@ COPY cni /etc/cni/net.d
 COPY cri/crictl.yaml /etc/crictl.yaml
 
 FROM alpine
-RUN apk add --no-cache bash ca-certificates iptables conntrack-tools
-COPY --from=reduced / /
-ENV CONCURRENTLY_NAMES=kubelet,cri-dockerd \
-    CONCURRENTLY_KILL_OTHERS=true \
-    CONCURRENTLY_KILL_SIGNAL=SIGINT
+RUN apk add --no-cache \
+    bash \
+    ca-certificates \
+    conntrack-tools \
+    conntrack-tools \
+    iptables \
+    jq
 
-ENTRYPOINT ["concurrently", "-P", "kubelet {*}", "cri-dockerd"]
+COPY --from=reduced / /
+ENTRYPOINT [ "entrypoint" ]
