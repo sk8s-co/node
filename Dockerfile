@@ -74,4 +74,4 @@ RUN apk add --no-cache \
     jq
 
 COPY --from=reduced / /
-ENTRYPOINT [ "entrypoint" ]
+ENTRYPOINT [ "_start" ]

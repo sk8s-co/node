@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euo pipefail
+
+_mkdirs() {
+    mkdir -p /var/run/kube/kubelet
+    mkdir -p /var/run/kube/cri-dockerd
+}
+
+_activate() {
+    KUBELET_YAML="$1"
+
+    if [ ! -f "$KUBELET_YAML" ]; then
+        echo "Error: Kubelet configuration file does not exist: $KUBELET_YAML"
+        exit 1
+    fi
+
+    echo "Activating kubelet configuration from: $KUBELET_YAML"
+    cp "$KUBELET_YAML" /var/run/kubelet.yaml
+}
+
+# Initialize the node with the given machine ID
+if [ -z "${MACHINE_ID:-}" ]; then
+    echo "Error: MACHINE_ID not set (should be set by _identify)"
+    exit 1
+fi
+
+# Ensure /etc/machine-id exists
+if [ ! -f /etc/machine-id ]; then
+    echo "$MACHINE_ID" > /etc/machine-id
+fi
+
+echo "Initializing Node..."
+echo "  Machine ID: $MACHINE_ID"
+
+if [ "$MACHINE_ID" = "standalone" ]; then
+    echo ""
+    echo "Warning: Running in standalone mode without /etc/machine-id mounted."
+    echo "         Launching in 5 seconds, press Ctrl+C to abort..."
+    echo ""
+    sleep 5
+fi
+
+_mkdirs
+_activate "/etc/kubernetes/kubelet/${MACHINE_ID}.yaml"

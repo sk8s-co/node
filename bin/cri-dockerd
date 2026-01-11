@@ -21,5 +21,7 @@ fi
 
 echo "Starting cri-dockerd..."
 exec /srv/cri-dockerd \
+    --container-runtime-endpoint=unix:///var/run/cri-dockerd.sock \
+    --cri-dockerd-root-directory=/var/run/kube/cri-dockerd \
     ${LOG_LEVEL_FLAG} \
     $CRI_DOCKERD_FLAGS

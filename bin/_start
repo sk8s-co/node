@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euo pipefail
+_KUBELET_ARGS="$@"
+
+# Defaults for standalone mode
+_KUBELET_FLAGS=(
+    # TODO: Infer cluster domain/dns from docker config
+    --cluster-domain=cluster.local
+    --cluster-dns=10.96.0.10
+)
+_CRI_DOCKERD_FLAGS=(
+    --network-plugin=cni
+    --hairpin-mode=hairpin-veth
+)
+_VERBOSITY_FLAG=""
+_LOG_LEVEL_FLAG=""
+
+# Main script execution starts here
+source _assert
+source _identify
+source _init
+
+if [ "${DEBUG:-false}" = "true" ]; then
+    echo "Debug mode is enabled."
+    echo "  kubelet Flags: ${_KUBELET_FLAGS[*]}"
+    echo "  cri-dockerd Flags: ${_CRI_DOCKERD_FLAGS[*]}"
+    _VERBOSITY_FLAG="--v=7"
+    _LOG_LEVEL_FLAG="--log-level=debug"
+fi
+
+export \
+    CONCURRENTLY_NAMES=kubelet,cri-dockerd \
+    CONCURRENTLY_KILL_OTHERS=true \
+    CONCURRENTLY_KILL_SIGNAL=SIGINT \
+    VERBOSITY_FLAG="$_VERBOSITY_FLAG" \
+    LOG_LEVEL_FLAG="$_LOG_LEVEL_FLAG" \
+    KUBELET_FLAGS="${_KUBELET_FLAGS[*]}" \
+    CRI_DOCKERD_FLAGS="${_CRI_DOCKERD_FLAGS[*]}"
+
+exec /srv/concurrently -P \
+    --teardown _stop \
+    "kubelet {*}" \
+    "cri-dockerd" \
+    $_KUBELET_ARGS

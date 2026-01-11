@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+
+# Determine the machine ID
+# Priority: MACHINE_ID env var > /etc/machine-id file > "standalone" default
+export MACHINE_ID="${MACHINE_ID:-$(cat /etc/machine-id 2>/dev/null || echo "standalone")}"

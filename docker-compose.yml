@@ -17,4 +17,4 @@ services:
       - /var/lib/docker:/var/lib/docker
       - /sys/fs/cgroup:/sys/fs/cgroup
     environment:
-      - DEBUG=true
+      - DEBUG=false
