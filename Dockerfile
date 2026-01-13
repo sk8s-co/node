@@ -1,3 +1,4 @@
+ARG COMPONENT=dockerd-kubelet
 ARG KUBE_VERSION=1.34
 ARG KUBE_VERSION_GO=1.24
 ARG KUBE_VERSION_PATCH=0
@@ -64,6 +65,14 @@ COPY cri/crictl.yaml /etc/crictl.yaml
 COPY kubelet/* /etc/kubernetes/kubelet/
 
 FROM alpine
+ARG COMPONENT \
+    KUBE_VERSION \
+    CRI_DOCKERD_VERSION \
+    CRITOOLS_VERSION \
+    CNI_VERSION \
+    TARGETARCH \
+    TARGETOS=linux
+
 RUN apk add --no-cache \
     bash \
     ca-certificates \
@@ -73,5 +82,6 @@ RUN apk add --no-cache \
     iptables \
     jq
 
+ENV USER_AGENT="${COMPONENT}/${KUBE_VERSION} (cri-dockerd/${CRI_DOCKERD_VERSION}; crictl/${CRITOOLS_VERSION}; cni/${CNI_VERSION}; alpine; ${TARGETOS}/${TARGETARCH})"
 COPY --from=reduced / /
-ENTRYPOINT [ "_start" ]
+ENTRYPOINT [ "start" ]

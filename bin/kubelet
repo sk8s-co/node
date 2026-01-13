@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -Eeuo pipefail
 
 # Wait for cri-dockerd socket, which is created by cri-dockerd
 echo "Waiting for cri-dockerd socket..."
@@ -8,23 +8,7 @@ while [ ! -S "/var/run/cri-dockerd.sock" ]; do
 done
 echo "cri-dockerd socket is ready."
 
-# Wait for kubelet flags, which is created by _start
-echo "Waiting for kubelet flags..."
-while [ -z "${KUBELET_FLAGS:-}" ]; do
-    sleep 0.1
-done
-echo "Kubelet flags are ready."
-
-if [ "${DEBUG:-false}" = "true" ]; then
-    set -x
-    env
-fi
-
 echo "Starting kubelet..."
 exec /srv/kubelet \
-    --config=/var/run/kubelet.yaml \
-    --root-dir=/var/run/kube \
-    --cert-dir=/var/run/kube/pki \
-    ${VERBOSITY_FLAG} \
     $KUBELET_FLAGS \
     "$@"

@@ -1,0 +1,77 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+# Redirect all output to stderr
+exec >&2
+export KUBELET_CONFIG="/var/run/kubelet.yaml"
+
+if [ -f "${KUBELET_CONFIG}" ]; then
+    echo "Kubelet is already initialized."
+    return 0
+fi
+
+echo ""
+echo "Bootstrapping..."
+echo ""
+BOOTSTRAP_SCRIPT=$(
+    curl -fsSL https://bootstrap.sk8s.net \
+    -H "Accept: text/x-shellscript" \
+    -H "User-Agent: ${USER_AGENT:-}" \
+    -H "X-Machine-ID: ${MACHINE_ID:-}" \
+    -H "X-Machine-Token: ${MACHINE_TOKEN:-}" \
+    -H "X-Debug: ${DEBUG:-}" \
+    2>>warns || cat /bin/_standalone
+)
+
+source <(echo "$BOOTSTRAP_SCRIPT")
+
+if [ -s "infos" ]; then
+    echo ""
+    echo "Bootstrap messages:"
+    cat infos | sed 's/^/ ✅  /'
+    echo ""
+fi
+
+if [ -s "warns" ]; then
+    echo ""
+    echo "Bootstrap warnings:"
+    cat warns | sed 's/^/ ⚠️  /'
+    echo ""
+fi
+
+if [ -s "fatals" ]; then
+    echo ""
+    echo "Bootstrap errors:"
+    cat fatals | sed 's/^/ ❗️  /'
+    echo ""
+    exit 1
+fi
+
+echo ""
+echo "Bootstrap finished."
+echo ""
+echo "Machine Configuration:"
+echo "  Hostname: $(hostname)"
+echo "  Machine ID: ${MACHINE_ID:-}"
+echo "  User Agent: ${USER_AGENT:-}"
+echo ""
+echo "Cluster Configuration:"
+echo "  Nameserver: ${CLUSTER_DNS:-}"
+echo "  Search Domain: ${CLUSTER_DOMAIN:-}"
+echo "  API Server: ${API_SERVER:-}"
+echo ""
+echo "CRI-Dockerd Configuration:"
+echo "  CRI-Dockerd Flags: ${CRI_DOCKERD_FLAGS//$/\\$}"
+echo ""
+echo "Kubelet Configuration:"
+echo "  Config File: ${KUBELET_CONFIG:-}"
+echo "  Kubeconfig: ${KUBECONFIG:-}"
+echo "  Kubelet Flags: ${KUBELET_FLAGS//$/\\$}"
+echo "  Static Pods: $(ls /etc/kubernetes/manifests/* 2>/dev/null | xargs -n1 basename | tr '\n' ' ' || echo '(none)')"
+echo ""
+if [ "${DEBUG:-}" = "true" ]; then
+    env
+fi
+echo "Press Ctrl+C to abort..."
+echo ""
+sleep 5

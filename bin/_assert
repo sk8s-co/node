@@ -1,8 +1,16 @@
 #!/bin/bash
-set -euo pipefail
-
-# Redirect all output to stderr
+set -Eeuo pipefail
 exec >&2
+
+# Critical requirement: /etc/resolv.conf must exist for DNS configuration
+if [ ! -f /etc/resolv.conf ]; then
+    echo "Error: /etc/resolv.conf is not available."
+    echo ""
+    echo "This file is required to configure cluster DNS settings."
+    echo "Docker should mount this automatically. Check your container runtime."
+    echo ""
+    exit 1
+fi
 
 _FAILURES=()
 
@@ -33,12 +41,6 @@ fi
 # Compare our IPC namespace with PID 1's (the host init)
 if [ "$(readlink /proc/1/ns/ipc 2>/dev/null)" != "$(readlink /proc/self/ns/ipc 2>/dev/null)" ]; then
     _FAILURES+=("--ipc=host")
-fi
-
-# Check for UTS host mode
-# Compare our UTS namespace with PID 1's (the host init)
-if [ "$(readlink /proc/1/ns/uts 2>/dev/null)" != "$(readlink /proc/self/ns/uts 2>/dev/null)" ]; then
-    _FAILURES+=("--uts=host")
 fi
 
 # Report all failures at once

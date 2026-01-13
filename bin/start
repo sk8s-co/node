@@ -1,0 +1,20 @@
+#!/bin/bash
+set -Eeuo pipefail
+_ARGS="$@"
+
+if [ "${DEBUG:-}" = "true" ]; then
+    set -x
+fi
+
+source _assert
+source _identify
+source _initialize
+
+exec /srv/concurrently -P \
+    --names kubelet,cri-dockerd \
+    --kill-others \
+    --kill-signal SIGINT \
+    --teardown stop \
+    "kubelet {*}" \
+    "cri-dockerd" \
+    $_ARGS

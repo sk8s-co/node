@@ -4,7 +4,8 @@ kind: KubeletConfiguration
 # Container Runtime
 containerRuntimeEndpoint: unix:///var/run/cri-dockerd.sock
 
-# Static Pods
+# Static Pods:
+#   - nginx.yaml
 staticPodPath: /etc/kubernetes/manifests
 
 # Authentication & Authorization (permissive for standalone mode)

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -Eeuo pipefail
 
 # Wait for docker socket, which should be volumed from host
 echo "Waiting for docker socket..."
@@ -8,20 +8,6 @@ while [ ! -S "/var/run/docker.sock" ]; do
 done
 echo "Docker socket is ready."
 
-echo "Waiting for cri-dockerd flags..."
-while [ -z "${CRI_DOCKERD_FLAGS:-}" ]; do
-    sleep 0.1
-done
-echo "cri-dockerd flags are ready."
-
-if [ "${DEBUG:-false}" = "true" ]; then
-    set -x
-    env
-fi
-
 echo "Starting cri-dockerd..."
 exec /srv/cri-dockerd \
-    --container-runtime-endpoint=unix:///var/run/cri-dockerd.sock \
-    --cri-dockerd-root-directory=/var/run/kube/cri-dockerd \
-    ${LOG_LEVEL_FLAG} \
     $CRI_DOCKERD_FLAGS
