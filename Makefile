@@ -17,11 +17,14 @@ run:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v /var/lib/docker:/var/lib/docker \
 		-v /sys/fs/cgroup:/sys/fs/cgroup \
-		-e DEBUG=true \
+		-e DEBUG=false \
 		$(IMAGE_NAME); \
 	CID=$$(docker ps -q --filter name=kubelet); [ -n "$$CID" ] && docker stop $$CID 2>/dev/null || true
 
 up: build run
+
+kubelogin: build
+	docker run -it --rm -p 18000:18000 --entrypoint /bin/kubelogin $(IMAGE_NAME)
 
 stop:
 	@CID=$$(docker ps -q --filter name=kubelet); [ -n "$$CID" ] && docker stop $$CID 2>/dev/null || true

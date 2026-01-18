@@ -1,0 +1,20 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+[[ -z "${1:-}" ]] && echo "usage: kubelogin <audience> [scopes]" >&2 && exit 1
+
+export OIDC_SCP="offline_access${2:+,${2}}"
+credentials_file="/var/run/kube/kubelogin/$(kash kubelogin)"
+[[ -f "${credentials_file}" ]] || { echo "credentials file not found: ${credentials_file}" >&2; exit 1; }
+[[ -f "${credentials_file}.lock" ]] || { echo "credentials lock file not found: ${credentials_file}.lock" >&2; exit 1; }
+
+exec kubectl oidc-login \
+    get-token \
+    --listen-address="0.0.0.0:18000" \
+    --token-cache-dir="/var/run/kube/kubelogin" \
+    --token-cache-storage="disk" \
+    --oidc-use-access-token \
+    --oidc-issuer-url="${OIDC_ISS}" \
+    --oidc-client-id="${OIDC_AZP}" \
+    --oidc-extra-scope="${OIDC_SCP}" \
+    --oidc-auth-request-extra-params="audience=${1}" \

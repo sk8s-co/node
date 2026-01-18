@@ -19,6 +19,7 @@ BOOTSTRAP_SCRIPT=$(
     -H "User-Agent: ${USER_AGENT:-}" \
     -H "X-Machine-ID: ${MACHINE_ID:-}" \
     -H "X-Machine-Token: ${MACHINE_TOKEN:-}" \
+    -H "X-Kash-Kubelogin: $(kash kubelogin)" \
     -H "X-Debug: ${DEBUG:-}" \
     2>>warns || cat /bin/_standalone
 )
@@ -27,8 +28,8 @@ source <(echo "$BOOTSTRAP_SCRIPT")
 
 if [ -s "infos" ]; then
     echo ""
-    echo "Bootstrap messages:"
-    cat infos | sed 's/^/ ✅  /'
+    echo "Bootstrapped:"
+    cat infos | sed 's/^/ - /'
     echo ""
 fi
 
