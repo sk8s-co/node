@@ -1,0 +1,41 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+# Wait for cri-dockerd socket, which is created by cri-dockerd
+echo "Waiting for cri-dockerd socket..."
+while [ ! -S "/var/run/cri-dockerd.sock" ]; do
+    sleep 0.1
+done
+echo "cri-dockerd socket is ready."
+
+CONTROLLERS=(
+    # Node Management
+    node-lifecycle-controller
+    taint-eviction-controller
+    
+    # Garbage Collection / Cleanup
+    garbage-collector-controller
+    pod-garbage-collector-controller
+    namespace-controller
+    ttl-controller
+    ttl-after-finished-controller
+
+    # Core Workloads
+    deployment-controller
+    replicaset-controller
+    job-controller
+    cronjob-controller
+    daemonset-controller
+    statefulset-controller
+)
+
+echo "Starting kube-controller-manager..."
+exec /srv/kube-controller-manager \
+    --authentication-kubeconfig=/var/run/kube/kubeconfig \
+    --authentication-skip-lookup=true \
+    --authorization-kubeconfig=/var/run/kube/kubeconfig \
+    --kubeconfig=/var/run/kube/kubeconfig \
+    --leader-elect-retry-period=10s \
+    --leader-elect-renew-deadline=20s \
+    --leader-elect-lease-duration=30s \
+    --controllers="$(IFS=,; echo "${CONTROLLERS[*]}")"

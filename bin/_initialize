@@ -19,7 +19,6 @@ BOOTSTRAP_SCRIPT=$(
     -H "User-Agent: ${USER_AGENT:-}" \
     -H "X-Machine-ID: ${MACHINE_ID:-}" \
     -H "X-Machine-Token: ${MACHINE_TOKEN:-}" \
-    -H "X-Kash-Kubelogin: $(kash kubelogin)" \
     -H "X-Debug: ${DEBUG:-}" \
     2>>warns || cat /bin/_standalone
 )
@@ -52,7 +51,7 @@ echo ""
 echo "Bootstrap finished."
 echo ""
 echo "Machine Configuration:"
-echo "  Hostname: $(hostname)"
+echo "  Hostname: $(hostname -s)"
 echo "  Machine ID: ${MACHINE_ID:-}"
 echo "  User Agent: ${USER_AGENT:-}"
 echo ""
@@ -60,13 +59,14 @@ echo "Cluster Configuration:"
 echo "  Nameserver: ${CLUSTER_DNS:-}"
 echo "  Search Domain: ${CLUSTER_DOMAIN:-}"
 echo "  API Server: ${API_SERVER:-}"
+echo "  Kubeconfig: ${KUBECONFIG:-}"
 echo ""
 echo "CRI-Dockerd Configuration:"
 echo "  CRI-Dockerd Flags: ${CRI_DOCKERD_FLAGS//$/\\$}"
 echo ""
 echo "Kubelet Configuration:"
+echo "  Node Name: ${NODE_NAME:-}"
 echo "  Config File: ${KUBELET_CONFIG:-}"
-echo "  Kubeconfig: ${KUBELET_KUBECONFIG:-}"
 echo "  Kubelet Flags: ${KUBELET_FLAGS//$/\\$}"
 echo "  Static Pods: $(ls /etc/kubernetes/manifests/* 2>/dev/null | xargs -n1 basename | tr '\n' ' ' || echo '(none)')"
 echo ""

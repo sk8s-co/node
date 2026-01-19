@@ -1,30 +1,38 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-echo "Starting graceful shutdown of Kubernetes containers..."
+echo "Shutting down ${NODE_NAME:-}..."
+kubectl taint node "${NODE_NAME:-}" node.kubernetes.io/not-ready:NoSchedule --overwrite || true
+kubectl taint node "${NODE_NAME:-}" node.kubernetes.io/not-ready:NoExecute --overwrite || true
+kubectl patch node "${NODE_NAME:-}" --type=merge --subresource=status -p '{
+  "status": {
+    "conditions": [{
+      "type": "Ready",
+      "status": "False",
+      "reason": "NodeShutdown",
+      "message": "Node is shutting down"
+    }]
+  }
+}' || true
 
+echo "Stopping containers..."
 # Find all containers with the io.kubernetes.docker.type label
 KUBE_CONTAINERS=$(docker ps -q --filter "label=io.kubernetes.docker.type" || true)
 
 if [ -z "$KUBE_CONTAINERS" ]; then
-    echo "No Kubernetes containers found to stop."
+    echo "No containers found to stop."
 else
-    echo "Found Kubernetes containers, stopping gracefully..."
-
-    # Gracefully stop containers (sends SIGTERM, waits 10s, then SIGKILL)
+    # Stop remaining containers (kubelet, static pods, etc.)
     for container_id in $KUBE_CONTAINERS; do
         echo "Stopping container: $container_id"
-        docker stop -s SIGTERM -t 10 "$container_id" || echo "Warning: Failed to stop $container_id"
+        docker stop -t 10 "$container_id" || echo "Warning: Failed to stop $container_id"
     done
 
     echo "Removing stopped containers..."
     for container_id in $KUBE_CONTAINERS; do
-        echo "Removing container: $container_id"
-        docker rm -f "$container_id" || echo "Warning: Failed to remove $container_id"
+        docker rm -f "$container_id" 2>/dev/null || true
     done
-
-    echo "Cleanup complete."
 fi
 
-echo "Node Shutdown Complete."
+echo "Node shutdown complete."
 exit 0

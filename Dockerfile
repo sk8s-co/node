@@ -53,23 +53,24 @@ RUN --mount=type=cache,id=kube-login-${KUBELOGIN_VERSION},target=/go \
     cd /kubelogin && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /kubelogin/kubelogin .
 
-FROM golang:1.25-alpine AS kash
-COPY go.mod go.sum /kash/
-COPY cmd/kash/ /kash/cmd/kash/
-RUN apk add --no-cache git
-RUN --mount=type=cache,id=kash-mod-cache,target=/go/pkg/mod \
-    cd /kash && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /kash/kash ./cmd/kash
+# FROM golang:1.25-alpine AS kash
+# COPY go.mod go.sum /kash/
+# COPY cmd/kash/ /kash/cmd/kash/
+# RUN apk add --no-cache git
+# RUN --mount=type=cache,id=kash-mod-cache,target=/go/pkg/mod \
+#     cd /kash && \
+#     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /kash/kash ./cmd/kash
 
 FROM scratch AS reduced
 COPY --from=kubernetes /kubelet /srv/kubelet
+COPY --from=kubernetes /kube-controller-manager /srv/kube-controller-manager
 COPY --from=kubernetes /kubectl /usr/local/bin/kubectl
 COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
 COPY --from=concurrently /concurrently /srv/concurrently
 COPY --from=cri-tools /cri-tools/bin/crictl /bin/crictl
 COPY --from=cni /cni/bin/* /opt/cni/bin/
 COPY --from=kubelogin /kubelogin/kubelogin /usr/local/bin/kubectl-oidc_login
-COPY --from=kash /kash/kash /usr/local/bin/kash
+# COPY --from=kash /kash/kash /usr/local/bin/kash
 COPY bin/* /bin/
 COPY manifests/* /etc/kubernetes/manifests/
 COPY cni/* /etc/cni/net.d/

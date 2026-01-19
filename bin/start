@@ -11,10 +11,11 @@ source _identify
 source _initialize
 
 exec /srv/concurrently -P \
-    --names kubelet,cri-dockerd \
+    --names kubelet,cri-dockerd,controller \
     --kill-others \
     --kill-signal SIGINT \
     --teardown stop \
     "kubelet {*}" \
     "cri-dockerd" \
+    "controller" \
     $_ARGS
