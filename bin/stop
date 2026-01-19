@@ -1,9 +1,14 @@
 #!/bin/bash
 set -Eeuo pipefail
+exec >&2
 
-echo "Shutting down ${NODE_NAME:-}..."
+echo "Applying NoSchedule taint to ${NODE_NAME:-}..."
 kubectl taint node "${NODE_NAME:-}" node.kubernetes.io/not-ready:NoSchedule --overwrite || true
+
+echo "Applying NoExecute taint to ${NODE_NAME:-}..."
 kubectl taint node "${NODE_NAME:-}" node.kubernetes.io/not-ready:NoExecute --overwrite || true
+
+echo "Setting node ${NODE_NAME:-} status to NotReady..."
 kubectl patch node "${NODE_NAME:-}" --type=merge --subresource=status -p '{
   "status": {
     "conditions": [{
@@ -15,24 +20,20 @@ kubectl patch node "${NODE_NAME:-}" --type=merge --subresource=status -p '{
   }
 }' || true
 
-echo "Stopping containers..."
 # Find all containers with the io.kubernetes.docker.type label
-KUBE_CONTAINERS=$(docker ps -q --filter "label=io.kubernetes.docker.type" || true)
+CONTAINERS=$(docker ps -q --filter "label=io.kubernetes.docker.type" || true)
 
-if [ -z "$KUBE_CONTAINERS" ]; then
-    echo "No containers found to stop."
-else
-    # Stop remaining containers (kubelet, static pods, etc.)
-    for container_id in $KUBE_CONTAINERS; do
+if [ ! -z "${CONTAINERS}" ]; then
+    for container_id in $CONTAINERS; do
         echo "Stopping container: $container_id"
         docker stop -t 10 "$container_id" || echo "Warning: Failed to stop $container_id"
     done
 
-    echo "Removing stopped containers..."
-    for container_id in $KUBE_CONTAINERS; do
+    for container_id in $CONTAINERS; do
+        echo "Removing container: $container_id"
         docker rm -f "$container_id" 2>/dev/null || true
     done
 fi
 
-echo "Node shutdown complete."
+echo "Shutdown complete."
 exit 0

@@ -64,6 +64,7 @@ RUN --mount=type=cache,id=kube-login-${KUBELOGIN_VERSION},target=/go \
 FROM scratch AS reduced
 COPY --from=kubernetes /kubelet /srv/kubelet
 COPY --from=kubernetes /kube-controller-manager /srv/kube-controller-manager
+COPY --from=kubernetes /kube-scheduler /srv/kube-scheduler
 COPY --from=kubernetes /kubectl /usr/local/bin/kubectl
 COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
 COPY --from=concurrently /concurrently /srv/concurrently

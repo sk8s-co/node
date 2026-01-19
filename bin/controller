@@ -32,9 +32,9 @@ CONTROLLERS=(
 echo "Starting kube-controller-manager..."
 exec /srv/kube-controller-manager \
     --authentication-kubeconfig=/var/run/kube/kubeconfig \
-    --authentication-skip-lookup=true \
     --authorization-kubeconfig=/var/run/kube/kubeconfig \
     --kubeconfig=/var/run/kube/kubeconfig \
+    --authentication-skip-lookup=true \
     --leader-elect-retry-period=10s \
     --leader-elect-renew-deadline=20s \
     --leader-elect-lease-duration=30s \

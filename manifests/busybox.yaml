@@ -3,8 +3,6 @@ kind: Pod
 metadata:
   name: busybox
 spec:
-  priority: 2000001000
-  priorityClassName: system-node-critical
   securityContext:
     seccompProfile:
       type: RuntimeDefault
