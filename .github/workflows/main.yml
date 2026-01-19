@@ -8,13 +8,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  kicbase:
+  build-and-push:
     strategy:
       matrix:
         include:
-          - kube-version: "1.34"
-            go-version: "1.24"
-            kicbase-version: "0.0.47"
+          - kube-version: "1.35"
+            go-version: "1.25"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,15 +50,14 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.kicbase
-          platforms: |
-            linux/amd64
-            linux/arm64
+          file: ./Dockerfile
+          platforms: linux/amd64, # linux/arm64
           pull: true
           push: ${{ github.ref == 'refs/heads/main' }}
           build-args: |
-            KICBASE_VERSION=${{ matrix.kicbase-version }}
             KUBE_VERSION=${{ matrix.kube-version }}
             KUBE_VERSION_GO=${{ matrix.go-version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.kube-version }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.kube-version }}
