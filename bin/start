@@ -12,7 +12,8 @@ source _initialize
 
 exec /srv/concurrently -P \
     --names kubelet,dockerd,controller,scheduler \
-    --kill-others \
+    --restart-tries -1 \
+    --restart-after exponential \
     --kill-signal SIGINT \
     --teardown stop \
     "kubelet {*}" \
