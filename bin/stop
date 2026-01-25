@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 exec >&2
 
+# TODO Make sure this is graceful in standalone mode
 echo "Applying NoSchedule taint to ${NODE_NAME:-}..."
 kubectl taint node "${NODE_NAME:-}" node.kubernetes.io/not-ready:NoSchedule --overwrite || true
 
@@ -28,7 +29,7 @@ if [ ! -z "${CONTAINERS}" ]; then
         echo "Stopping container: $container_id"
         docker stop -t 10 "$container_id" || echo "Warning: Failed to stop $container_id"
     done
-
+    
     for container_id in $CONTAINERS; do
         echo "Removing container: $container_id"
         docker rm -f "$container_id" 2>/dev/null || true

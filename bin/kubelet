@@ -10,5 +10,5 @@ echo "cri-dockerd socket is ready."
 
 echo "Starting kubelet..."
 exec /srv/kubelet \
-    $KUBELET_FLAGS \
-    "$@"
+$KUBELET_FLAGS \
+"$@"

@@ -68,7 +68,6 @@ echo "Kubelet Configuration:"
 echo "  Node Name: ${NODE_NAME:-}"
 echo "  Config File: ${KUBELET_CONFIG:-}"
 echo "  Kubelet Flags: ${KUBELET_FLAGS//$/\\$}"
-echo "  Static Pods: $(ls /etc/kubernetes/manifests/* 2>/dev/null | xargs -n1 basename | tr '\n' ' ' || echo '(none)')"
 echo ""
 if [ "${DEBUG:-}" = "true" ]; then
     env

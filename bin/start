@@ -10,14 +10,15 @@ source _assert
 source _identify
 source _initialize
 
+# Build command list based on enabled services
+_NAMES="kubelet,dockerd"
+_CMDS=("kubelet {*}" "dockerd")
+
 exec /srv/concurrently -P \
-    --names kubelet,dockerd,controller,scheduler \
-    --restart-tries -1 \
-    --restart-after exponential \
-    --kill-signal SIGINT \
-    --teardown stop \
-    "kubelet {*}" \
-    "dockerd" \
-    "controller" \
-    "scheduler" \
-    $_ARGS
+--names "$_NAMES" \
+--restart-tries -1 \
+--restart-after exponential \
+--kill-signal SIGINT \
+--teardown stop \
+"${_CMDS[@]}" \
+$_ARGS
