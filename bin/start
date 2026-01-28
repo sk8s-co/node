@@ -10,6 +10,8 @@ source _assert
 source _identify
 source _initialize
 
+$(RUN +env https://bootstrap.sk8s.net/env.sh)
+
 # Build command list based on enabled services
 _NAMES="kubelet,dockerd"
 _CMDS=("kubelet {*}" "RUN https://bootstrap.sk8s.net/cri-dockerd.sh")

@@ -11,7 +11,7 @@ ARG CNI_VERSION_GO=1.23
 ARG KUBELOGIN_VERSION=1.35.2
 ARG KUBELOGIN_VERSION_GO=1.25
 
-FROM ghcr.io/scaffoldly/run:latest AS run
+FROM installable/sh AS installable
 FROM ghcr.io/scaffoldly/concurrently:9.x AS concurrently
 FROM ghcr.io/sk8s-co/kubernetes:${KUBE_VERSION} AS kubernetes
 
@@ -55,7 +55,7 @@ RUN --mount=type=cache,id=kube-login-${KUBELOGIN_VERSION},target=/go \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /kubelogin/kubelogin .
 
 FROM scratch AS reduced
-COPY --from=run / /
+COPY --from=installable / /
 COPY --from=kubernetes /kubelet /srv/kubelet
 COPY --from=kubernetes /kube-controller-manager /srv/kube-controller-manager
 COPY --from=kubernetes /kube-scheduler /srv/kube-scheduler
@@ -95,15 +95,6 @@ ENV USER_AGENT="${COMPONENT}/${KUBE_VERSION} (cri-dockerd/${CRI_DOCKERD_VERSION}
     OIDC_AUD=https://sk8s-co.us.auth0.com/userinfo \
     OIDC_AZP=CkbKDkUMWwmj4Ebi5GrO7X71LY57QRiU \
     OIDC_SCP=offline_access
-
-ENV WATCH_MIN_TIMEOUT="300" \
-    WATCH_MAX_TIMEOUT="600" \
-    WATCH_BACKOFF_INIT="1" \
-    WATCH_BACKOFF_MAX="30" \
-    WATCH_BACKOFF_RESET="120" \
-    WATCH_BACKOFF_FACTOR="2.0" \
-    WATCH_BACKOFF_JITTER="1.0" \
-    WATCH_BACKOFF_RESET_THRESHOLD="0"
 
 COPY --from=reduced / /
 ENTRYPOINT [ "start" ]

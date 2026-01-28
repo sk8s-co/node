@@ -18,7 +18,7 @@ up: build
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v /var/lib/docker:/var/lib/docker \
 		-v /sys/fs/cgroup:/sys/fs/cgroup \
-		-v ${HOME}/.kube/cache/oidc-login:/root/.kube/cache/oidc-login:ro \
+		-v ${HOME}/.kube/cache:/root/.kube/cache \
 		-e MACHINE_TOKEN="$$(kubectl oidc-login get-token \
 			--oidc-use-access-token \
 			--oidc-issuer-url=https://auth.sk8s.net/ \
