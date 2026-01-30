@@ -1,4 +1,4 @@
-ARG COMPONENT=dockerd-kubelet
+ARG COMPONENT=kubelet-dockerd
 ARG KUBE_VERSION=1.35
 ARG KUBE_VERSION_GO=1.25
 ARG KUBE_VERSION_PATCH=0
@@ -8,6 +8,8 @@ ARG CRITOOLS_VERSION=1.33.0
 ARG CRITOOLS_VERSION_GO=1.25
 ARG CNI_VERSION=1.7.1
 ARG CNI_VERSION_GO=1.23
+ARG CLOUDFLARED_VERSION=2026.1.2
+ARG CLOUDFLARED_VERSION_GO=1.24
 ARG KUBELOGIN_VERSION=1.35.2
 ARG KUBELOGIN_VERSION_GO=1.25
 
@@ -46,6 +48,14 @@ RUN --mount=type=cache,id=cni-${CNI_VERSION},target=/go \
     cd /cni && \
     CGO_ENABLED=0 ./build_linux.sh -ldflags '-extldflags -static -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=${CNI_VERSION}'
 
+FROM golang:${CLOUDFLARED_VERSION_GO}-alpine AS cloudflared
+ARG CLOUDFLARED_VERSION
+RUN apk add --no-cache git make
+RUN --mount=type=cache,id=cloudflared-${CLOUDFLARED_VERSION},target=/go \
+    git clone https://github.com/cloudflare/cloudflared.git -b ${CLOUDFLARED_VERSION} --depth=1 /cloudflared
+RUN cd /cloudflared && \
+    CGO_ENABLED=0 make cloudflared
+
 FROM golang:${KUBELOGIN_VERSION_GO}-alpine AS kubelogin
 ARG KUBELOGIN_VERSION
 RUN apk add --no-cache git make
@@ -64,6 +74,7 @@ COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
 COPY --from=concurrently /concurrently /srv/concurrently
 COPY --from=cri-tools /cri-tools/bin/crictl /bin/crictl
 COPY --from=cni /cni/bin/* /opt/cni/bin/
+COPY --from=cloudflared /cloudflared/cloudflared /srv/cloudflared
 COPY --from=kubelogin /kubelogin/kubelogin /usr/local/bin/kubectl-oidc_login
 COPY bin/* /bin/
 COPY manifests/* /etc/kubernetes/manifests/
@@ -90,11 +101,6 @@ RUN apk add --no-cache \
     iptables \
     jq
 
-ENV USER_AGENT="${COMPONENT}/${KUBE_VERSION} (cri-dockerd/${CRI_DOCKERD_VERSION}; crictl/${CRITOOLS_VERSION}; cni/${CNI_VERSION}; kubelogin/${KUBELOGIN_VERSION}; alpine; ${TARGETOS}/${TARGETARCH})" \
-    OIDC_ISS=https://auth.sk8s.net/ \
-    OIDC_AUD=https://sk8s-co.us.auth0.com/userinfo \
-    OIDC_AZP=CkbKDkUMWwmj4Ebi5GrO7X71LY57QRiU \
-    OIDC_SCP=offline_access
-
+ENV USER_AGENT="${COMPONENT}/${KUBE_VERSION} (cri-dockerd/${CRI_DOCKERD_VERSION}; crictl/${CRITOOLS_VERSION}; cni/${CNI_VERSION}; kubelogin/${KUBELOGIN_VERSION}; alpine; ${TARGETOS}/${TARGETARCH})"
 COPY --from=reduced / /
 ENTRYPOINT [ "start" ]

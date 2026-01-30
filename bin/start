@@ -1,20 +1,25 @@
 #!/bin/bash
 set -Eeuo pipefail
-_ARGS="$@"
 
 if [ "${DEBUG:-}" = "true" ]; then
     set -x
 fi
 
+# Ensure Docker Container is correctly configured
 source _assert
-source _identify
-source _initialize
 
+# Load base environment from bootstrap
 $(RUN +env https://bootstrap.sk8s.net/env.sh)
 
-# Build command list based on enabled services
-_NAMES="kubelet,dockerd"
-_CMDS=("kubelet {*}" "RUN https://bootstrap.sk8s.net/cri-dockerd.sh")
+_NAMES="kubelet,dockerd,kunnel"
+_CMDS=(
+    "RUN +env https://bootstrap.sk8s.net/kubelet.sh --v=1"
+    "RUN +env https://bootstrap.sk8s.net/cri-dockerd.sh"
+    "RUN +env https://bootstrap.sk8s.net/cloudflared.sh ${KUBELET_PORT}"
+)
+
+# TODO: remove stuff from /srv and use the $PATH directly
+# TODO: make kublet a concurrently itself, and tightly couple cloudflared.sh to it
 
 exec /srv/concurrently -P \
 --names "$_NAMES" \
@@ -22,5 +27,4 @@ exec /srv/concurrently -P \
 --restart-after exponential \
 --kill-signal SIGINT \
 --teardown stop \
-"${_CMDS[@]}" \
-$_ARGS
+"${_CMDS[@]}"
