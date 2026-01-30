@@ -8,7 +8,14 @@ build:
 	@docker build --pull -t $(IMAGE_NAME) .
 
 up: build
-	@echo "Starting container (Ctrl+C to stop)..."
+	@set -e
+	@echo "Logging via OIDC..."
+	@kubectl oidc-login get-token \
+		--oidc-issuer-url=https://auth.sk8s.net/ \
+		--oidc-client-id=CkbKDkUMWwmj4Ebi5GrO7X71LY57QRiU \
+		--oidc-extra-scope=offline_access,system:authenticated,system:masters,system:nodes \
+		--oidc-auth-request-extra-params="audience=$(KUBE_APISERVER)" > /dev/null
+	@echo "Starting kubelet container..."
 	@docker run --rm -it \
 		--name kubelet \
 		--hostname $$(hostname -s) \
@@ -19,12 +26,7 @@ up: build
 		-v /var/lib/docker:/var/lib/docker \
 		-v /sys/fs/cgroup:/sys/fs/cgroup \
 		-v ${HOME}/.kube/cache:/root/.kube/cache \
-		-e MACHINE_TOKEN="$$(kubectl oidc-login get-token \
-			--oidc-use-access-token \
-			--oidc-issuer-url=https://auth.sk8s.net/ \
-			--oidc-client-id=CkbKDkUMWwmj4Ebi5GrO7X71LY57QRiU \
-			--oidc-extra-scope=offline_access,system:authenticated,system:masters,system:nodes \
-			--oidc-auth-request-extra-params="audience=$(KUBE_APISERVER)" | jq -r '.status.token')" \
+		-e OIDC_AUD="$(KUBE_APISERVER)" \
 		-e DEBUG=false \
 		$(IMAGE_NAME)
 
