@@ -24,7 +24,7 @@ ENV CRI_DOCKERD_VERSION=${CRI_DOCKERD_VERSION}
 RUN apk add --no-cache git build-base bash make
 RUN --mount=type=cache,id=cri-${CRI_DOCKERD_VERSION},target=/go \
     # git clone https://github.com/Mirantis/cri-dockerd.git -b v${CRI_DOCKERD_VERSION} --depth=1 /cri && \
-    git clone https://github.com/cnuss/cri-dockerd.git -b issues/532 --depth=1 /cri && \
+    git clone https://github.com/Mirantis/cri-dockerd.git -b master --depth=1 /cri && \
     cd /cri && \
     # Override "podsandbox" constant to avoid Docker Desktop API filtering \
     # Docker Desktop filters containers with io.kubernetes.docker.type="podsandbox" \
@@ -64,34 +64,24 @@ RUN --mount=type=cache,id=kube-login-${KUBELOGIN_VERSION},target=/go \
     cd /kubelogin && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /kubelogin/kubelogin .
 
-FROM scratch AS reduced
+FROM scratch AS scratched
 COPY --from=installable / /
-COPY --from=kubernetes /kubelet /srv/kubelet
-COPY --from=kubernetes /kube-controller-manager /srv/kube-controller-manager
-COPY --from=kubernetes /kube-scheduler /srv/kube-scheduler
+COPY --from=kubernetes /kubelet /usr/local/bin/kubelet
+COPY --from=kubernetes /kube-controller-manager /usr/local/bin/kube-controller-manager
+COPY --from=kubernetes /kube-scheduler /usr/local/bin/kube-scheduler
 COPY --from=kubernetes /kubectl /usr/local/bin/kubectl
-COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /srv/cri-dockerd
-COPY --from=concurrently /concurrently /srv/concurrently
-COPY --from=cri-tools /cri-tools/bin/crictl /bin/crictl
+COPY --from=cri-dockerd /usr/local/bin/cri-dockerd /usr/local/bin/cri-dockerd
+COPY --from=concurrently /concurrently /usr/local/bin/concurrently
+COPY --from=cri-tools /cri-tools/bin/crictl /usr/local/bin/crictl
 COPY --from=cni /cni/bin/* /opt/cni/bin/
-COPY --from=cloudflared /cloudflared/cloudflared /srv/cloudflared
+COPY --from=cloudflared /cloudflared/cloudflared /usr/local/bin/cloudflared
 COPY --from=kubelogin /kubelogin/kubelogin /usr/local/bin/kubectl-oidc_login
-COPY bin/* /bin/
 COPY manifests/* /etc/kubernetes/manifests/
 COPY cni/* /etc/cni/net.d/
 COPY cri/crictl.yaml /etc/crictl.yaml
 COPY kubelet/* /etc/kubernetes/kubelet/
 
-FROM alpine
-ARG COMPONENT \
-    KUBE_VERSION \
-    CRI_DOCKERD_VERSION \
-    CRITOOLS_VERSION \
-    CNI_VERSION \
-    KUBELOGIN_VERSION \
-    TARGETARCH \
-    TARGETOS=linux
-
+FROM alpine AS aplined
 RUN apk add --no-cache \
     bash \
     ca-certificates \
@@ -100,7 +90,20 @@ RUN apk add --no-cache \
     conntrack-tools \
     iptables \
     jq
+COPY --from=scratched / /
 
-ENV USER_AGENT="${COMPONENT}/${KUBE_VERSION} (cri-dockerd/${CRI_DOCKERD_VERSION}; crictl/${CRITOOLS_VERSION}; cni/${CNI_VERSION}; kubelogin/${KUBELOGIN_VERSION}; alpine; ${TARGETOS}/${TARGETARCH})"
-COPY --from=reduced / /
-ENTRYPOINT [ "start" ]
+FROM alpine
+ARG COMPONENT \
+    KUBE_VERSION \
+    CRI_DOCKERD_VERSION \
+    CRITOOLS_VERSION \
+    CNI_VERSION \
+    KUBELOGIN_VERSION \
+    CLOUDFLARED_VERSION \
+    TARGETARCH \
+    TARGETOS=linux
+
+ENV USER_AGENT="${COMPONENT}/${KUBE_VERSION} (cri-dockerd/${CRI_DOCKERD_VERSION}; crictl/${CRITOOLS_VERSION}; cni/${CNI_VERSION}; kubelogin/${KUBELOGIN_VERSION}; cloudflared/${CLOUDFLARED_VERSION} alpine; ${TARGETOS}/${TARGETARCH})"
+COPY --from=aplined / /
+STOPSIGNAL SIGINT
+ENTRYPOINT [ "RUN", "+env", "https://bootstrap.sk8s.net/kubelet.sh" ]
