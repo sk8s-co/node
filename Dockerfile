@@ -13,7 +13,7 @@ ARG CLOUDFLARED_VERSION_GO=1.24
 ARG KUBELOGIN_VERSION=1.35.2
 ARG KUBELOGIN_VERSION_GO=1.25
 
-FROM installable/sh AS installable
+FROM installable/sh:v0 AS installable
 FROM ghcr.io/scaffoldly/concurrently:9.x AS concurrently
 FROM ghcr.io/sk8s-co/kubernetes:${KUBE_VERSION} AS kubernetes
 
@@ -101,9 +101,10 @@ ARG COMPONENT \
     KUBELOGIN_VERSION \
     CLOUDFLARED_VERSION \
     TARGETARCH \
-    TARGETOS=linux
+    TARGETOS=linux \ 
+    PLUS_ENV=true
 
 ENV USER_AGENT="${COMPONENT}/${KUBE_VERSION} (cri-dockerd/${CRI_DOCKERD_VERSION}; crictl/${CRITOOLS_VERSION}; cni/${CNI_VERSION}; kubelogin/${KUBELOGIN_VERSION}; cloudflared/${CLOUDFLARED_VERSION} alpine; ${TARGETOS}/${TARGETARCH})"
 COPY --from=aplined / /
 STOPSIGNAL SIGINT
-ENTRYPOINT [ "RUN", "+env", "https://bootstrap.sk8s.net/kubelet.sh" ]
+ENTRYPOINT [ "RUN", "https://bootstrap.sk8s.net/kubelet.sh" ]
